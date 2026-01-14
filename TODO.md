@@ -1,1 +1,5 @@
 - [ ] Twine and workflow to publish to Gitea packages
+- [ ] Attachments support `/sendfile` and handling of received files. 
+- [ ] Loading indication for stamp generation 
+- [ ] Colors
+- [ ] Chat scrollback
