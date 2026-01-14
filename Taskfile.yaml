@@ -16,3 +16,13 @@ tasks:
     cmds:
       - poetry build
 
+  lint:
+    desc: Run linting
+    cmds:
+      - poetry run ruff check .
+
+  format:
+    desc: Format code
+    cmds:
+      - poetry run ruff format .
+
