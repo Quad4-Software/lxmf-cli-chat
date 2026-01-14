@@ -1,0 +1,18 @@
+version: '3'
+
+tasks:
+  test:
+    desc: Run all tests
+    cmds:
+      - poetry run pytest
+
+  dev:
+    desc: Run the application in debug mode
+    cmds:
+      - poetry run lxmf-chat --debug
+
+  build:
+    desc: Build the package
+    cmds:
+      - poetry build
+
