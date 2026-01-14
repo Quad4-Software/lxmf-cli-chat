@@ -6,6 +6,8 @@ Ephemeral as in chat sessions and announces are ephemeral/not stored, identity i
 
 Only dependencies are RNS and LXMF.
 
+![showcase image 2026](https://git.quad4.io/RNS-Things/LXMF-CLI-Chat/raw/commit/793c857384d0726a3e643b40bbdb00aff34badd0/showcase/2026-01-14_11-05.png)
+
 ## Installation
 
 ```bash
