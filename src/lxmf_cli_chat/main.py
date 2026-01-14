@@ -31,6 +31,12 @@ ICON_PENDING = "◷"
 ICON_SENT = "✓"
 ICON_DELIVERED = "✓✓"
 
+# Status colors
+COLOR_STATUS_PENDING = "\033[0;33m"
+COLOR_STATUS_SENT = "\033[0;32m"
+COLOR_STATUS_DELIVERED = "\033[0;36m"
+COLOR_STATUS_FAILED = "\033[0;31m"
+
 logger = logging.getLogger("lxmf_cli_chat")
 
 class PropagationAnnounceHandler:
@@ -121,6 +127,7 @@ class LXMFChat:
         self.target_hash_hex = ""
         self.ui_mode = "chat"
         self.peer_list_scroll = 0
+        self.chat_scroll = 0
         self.selected_peer_idx = 0
         
         self.showing_manual = False
@@ -262,6 +269,45 @@ class LXMFChat:
                     "hops": hops
                 }
 
+                # Check for attachments
+                fields = lxm.fields if hasattr(lxm, 'fields') and lxm.fields else {}
+                
+                # Sideband and other clients sometimes use integer keys, 
+                # but we should be robust and check for potential variations.
+                attachments = None
+                if LXMF.FIELD_FILE_ATTACHMENTS in fields:
+                    attachments = fields[LXMF.FIELD_FILE_ATTACHMENTS]
+                elif str(LXMF.FIELD_FILE_ATTACHMENTS) in fields:
+                    attachments = fields[str(LXMF.FIELD_FILE_ATTACHMENTS)]
+                elif bytes([LXMF.FIELD_FILE_ATTACHMENTS]) in fields:
+                    attachments = fields[bytes([LXMF.FIELD_FILE_ATTACHMENTS])]
+
+                if attachments and isinstance(attachments, list):
+                    for att in attachments:
+                        if isinstance(att, dict):
+                            att_name = str(att.get("name") or att.get(b"name") or "unnamed")
+                            att_data = att.get("data") or att.get(b"data") or b""
+                            
+                            # Save to downloads folder
+                            dl_path = os.path.join(self.storage_path, "downloads")
+                            os.makedirs(dl_path, exist_ok=True)
+                            
+                            # Sanitize filename
+                            safe_name = "".join([c for c in att_name if c.isalnum() or c in "._- "]).strip()
+                            if not safe_name: safe_name = "unnamed_file"
+                            
+                            save_path = os.path.join(dl_path, f"{int(time.time())}_{safe_name}")
+                            try:
+                                with open(save_path, "wb") as f:
+                                    f.write(att_data)
+                                attachment_info = f"\n{COLOR_INFO}[Attachment: {safe_name} saved to {save_path}]{COLOR_RESET}"
+                                msg_data["content"] += attachment_info
+                                logger.info(f"Saved attachment {safe_name} to {save_path}")
+                            except Exception as e:
+                                error_info = f"\n{COLOR_ERROR}[Failed to save attachment {safe_name}: {e}]{COLOR_RESET}"
+                                msg_data["content"] += error_info
+                                logger.error(f"Failed to save attachment {safe_name}: {e}")
+
                 if sender_hash_hex not in self.messages:
                     self.messages[sender_hash_hex] = []
                 
@@ -282,7 +328,7 @@ class LXMFChat:
             if not self.headless:
                 self.refresh_ui()
             else:
-                print(f"[{msg_time}] {sender_name}: {lxm.content_as_string()}")
+                print(f"[{msg_time}] {sender_name}: {msg_data['content']}")
         except Exception as e:
             if not self.headless:
                 logger.error(f"Error in on_message: {e}")
@@ -315,6 +361,7 @@ class LXMFChat:
             "  /s, /search <query>  Search peers by name or hash",
             "  /n, /name <name>     Change your display name",
             "  /a, /announce        Send an announce to the network",
+            "  /sf, /sendfile <p>   Send a file to the current target",
             "  /id                  Show your own destination hash",
             "  /q, /quit            Exit the application",
             "",
@@ -334,6 +381,7 @@ class LXMFChat:
             "  Ctrl-L               Redraw screen",
             "  Ctrl-Q               Quit",
             "  Esc                  Return to chat mode",
+            "  PageUp/PageDown      Scroll chat history",
             "",
             "METADATA LABELS:",
             "  (S)                  Signed: Cryptographically verified sender",
@@ -381,8 +429,8 @@ class LXMFChat:
         # Use a buffer to reduce flicker
         buf = []
         
-        # Clear screen and move to top
-        buf.append("\033[2J\033[H")
+        # Hide cursor during redraw, clear screen and move to top
+        buf.append("\033[?25l\033[2J\033[H")
         
         # Header (Lines 1 & 2)
         header_text = f" LXMF CLI Chat | {self.display_name} | {RNS.prettyhexrep(self.source.hash)} "
@@ -428,15 +476,27 @@ class LXMFChat:
 
                     # Status icon
                     status_icon = str(msg.get("status_icon", ICON_SENT))
+                    status_color = COLOR_RESET
+                    if status_icon == ICON_DELIVERED:
+                        status_color = COLOR_STATUS_DELIVERED
+                    elif status_icon == ICON_SENT:
+                        status_color = COLOR_STATUS_SENT
+                    elif status_icon == ICON_PENDING:
+                        status_color = COLOR_STATUS_PENDING
+                    elif status_icon == "!":
+                        status_color = COLOR_STATUS_FAILED
+                    
+                    status_icon_colored = f"{status_color}{status_icon}{COLOR_RESET}"
+
                     if sender == "Me":
                         method = msg.get('method', 'Direct')
                         method_char = str(method)[0] if method else "?"
-                        status_str = f" \033[0;34m({method_char})\033[0m {status_icon}"
+                        status_str = f" \033[0;34m({method_char})\033[0m {status_icon_colored}"
                         status_msg = msg.get("status")
                         if status_msg and "retrying" in str(status_msg):
                             status_str += f" {COLOR_DIM}{status_msg}{COLOR_RESET}"
                     else:
-                        status_str = f" {status_icon}"
+                        status_str = f" {status_icon_colored}"
 
                     prefix = f"[{msg_time}] {sender}: "
                     content = str(msg.get('content', ''))
@@ -453,7 +513,17 @@ class LXMFChat:
                             wrapped_lines.append(f"{indent}{COLOR_DIM}{chunk}{COLOR_RESET}")
 
             # Display messages from line 3 downwards
-            display_msgs = wrapped_lines[-(msg_area_height):]
+            if self.chat_scroll < 0: self.chat_scroll = 0
+            max_scroll = max(0, len(wrapped_lines) - msg_area_height)
+            if self.chat_scroll > max_scroll: self.chat_scroll = max_scroll
+
+            if self.chat_scroll == 0:
+                display_msgs = wrapped_lines[-(msg_area_height):]
+            else:
+                end_idx = len(wrapped_lines) - self.chat_scroll
+                start_idx = max(0, end_idx - msg_area_height)
+                display_msgs = wrapped_lines[start_idx:end_idx]
+
             if not self.target_hash_hex and not display_msgs:
                 buf.append(f"\033[3;1H{COLOR_INFO} Welcome to LXMF CLI Chat!{COLOR_RESET}")
                 buf.append(f"\033[4;1H No active chat selected.")
@@ -526,8 +596,8 @@ class LXMFChat:
         
         # Prompt line
         buf.append(f"\033[{height};1H\033[K{self.prompt}{self.input_buffer}")
-        # Position cursor
-        buf.append(f"\033[{height};{len(self.prompt) + self.cursor_pos + 1}H")
+        # Position and show cursor
+        buf.append(f"\033[{height};{len(self.prompt) + self.cursor_pos + 1}H\033[?25h")
         
         sys.stdout.write("".join(buf))
         sys.stdout.flush()
@@ -712,6 +782,30 @@ class LXMFChat:
             self.set_status(f"{COLOR_INFO}Announce sent{COLOR_RESET}")
         elif cmd == "/id":
             self.set_status(f"{COLOR_INFO}Your ID: {RNS.prettyhexrep(self.source.hash)}{COLOR_RESET}")
+        elif cmd in ("/sendfile", "/sf"):
+            if not self.target_hash_hex:
+                self.set_status(f"{COLOR_ERROR}No target set. Use /t <hex> first.{COLOR_RESET}")
+                return
+            if not args:
+                self.set_status(f"{COLOR_ERROR}Usage: /sendfile <path>{COLOR_RESET}")
+                return
+            file_path = args.strip()
+            # Expand ~ if present
+            file_path = os.path.expanduser(file_path)
+            if not os.path.exists(file_path):
+                self.set_status(f"{COLOR_ERROR}File not found: {file_path}{COLOR_RESET}")
+                return
+            try:
+                with open(file_path, "rb") as f:
+                    file_content = f.read()
+                filename = os.path.basename(file_path)
+                fields = {
+                    LXMF.FIELD_FILE_ATTACHMENTS: [{"name": filename, "data": file_content}]
+                }
+                self.send_message(self.target_hash_hex, f"Sent file: {filename}", fields=fields)
+                self.set_status(f"{COLOR_INFO}Sending file {filename}...{COLOR_RESET}")
+            except Exception as e:
+                self.set_status(f"{COLOR_ERROR}Failed to send file: {e}{COLOR_RESET}")
         elif cmd == "/pn":
             parts = args.split(" ")
             subcmd = parts[0].lower()
@@ -753,7 +847,7 @@ class LXMFChat:
             else:
                 self.set_status(f"{COLOR_ERROR}No target set. Use /t <hex> or /p to browse peers.{COLOR_RESET}")
 
-    def send_message(self, destination_hash_hex, content, include_ticket=False):
+    def send_message(self, destination_hash_hex, content, include_ticket=False, fields=None):
         """Send an LXMF message to a destination."""
         try:
             dest_hash = bytes.fromhex(destination_hash_hex)
@@ -788,9 +882,19 @@ class LXMFChat:
                 if not RNS.Transport.has_path(dest_hash) and self.active_pn:
                     method = LXMF.LXMessage.PROPAGATED
             
-            lxm = LXMF.LXMessage(dest, self.source, str(content or ""), desired_method=method, include_ticket=include_ticket)
+            # Show PoW status if cost is known and potentially high
+            stamp_cost = self.router.get_outbound_stamp_cost(dest_hash)
+            if stamp_cost and stamp_cost > 0:
+                self.set_status(f"{COLOR_STAMP}Generating Proof of Work (Cost: {stamp_cost})...{COLOR_RESET}", duration=0)
+                self.refresh_ui()
+
+            lxm = LXMF.LXMessage(dest, self.source, str(content or ""), desired_method=method, include_ticket=include_ticket, fields=fields)
             lxm.pack()
             
+            # Clear PoW status
+            if self.status_msg and "Generating Proof of Work" in self.status_msg:
+                self.set_status("")
+
             # Track delivery status
             msg_id = RNS.hexrep(lxm.hash, delimit=False)
             
@@ -847,6 +951,7 @@ class LXMFChat:
                     self.messages[destination_hash_hex] = []
                 
                 self.messages[destination_hash_hex].append(msg_data)
+                self.chat_scroll = 0
                 
                 # Update active sessions
                 if destination_hash_hex in self.active_sessions:
@@ -879,8 +984,29 @@ class LXMFChat:
             time.sleep(0.5)
             self.refresh_ui()
 
+    def cleanup(self):
+        """Perform cleanup before exiting."""
+        self.running = False
+        if not self.headless:
+            # Clear screen, restore cursor, and show it
+            sys.stdout.write("\033[2J\033[H\033[?25h")
+            sys.stdout.flush()
+        
+        # Give bg thread time to exit
+        if hasattr(self, "bg_thread") and self.bg_thread.is_alive():
+            self.bg_thread.join(timeout=1.0)
+        
+        logger.info("Cleanup complete")
+
     def run(self):
         """Start the application and its main loop."""
+        # Setup signal handlers for graceful exit
+        def handle_exit(sig, frame):
+            self.running = False
+        
+        signal.signal(signal.SIGINT, handle_exit)
+        signal.signal(signal.SIGTERM, handle_exit)
+        
         self.router.announce(self.source.hash)
         
         # Setup SIGWINCH for immediate resize refresh (not on Windows)
@@ -891,10 +1017,13 @@ class LXMFChat:
             
         self.bg_thread.start()
         
-        if self.is_windows:
-            self.run_windows()
-        else:
-            self.run_unix()
+        try:
+            if self.is_windows:
+                self.run_windows()
+            else:
+                self.run_unix()
+        finally:
+            self.cleanup()
 
     def run_unix(self):
         """Run the main loop for Unix-like systems."""
@@ -980,6 +1109,14 @@ class LXMFChat:
                                 self.cursor_pos -= 1
                             elif seq == "[C" and self.cursor_pos < len(self.input_buffer): # Right
                                 self.cursor_pos += 1
+                            elif seq == "[5": # PageUp
+                                if sys.stdin.read(1) == "~":
+                                    if self.ui_mode == "chat":
+                                        self.chat_scroll += 10
+                            elif seq == "[6": # PageDown
+                                if sys.stdin.read(1) == "~":
+                                    if self.ui_mode == "chat":
+                                        self.chat_scroll = max(0, self.chat_scroll - 10)
                         else: # Just Esc
                             self.ui_mode = "chat"
                     elif char == "\x15": # Ctrl-U: Clear line
@@ -1078,6 +1215,12 @@ class LXMFChat:
                         self.cursor_pos -= 0
                     elif spec == b"M" and self.cursor_pos < len(self.input_buffer): # Right
                         self.cursor_pos += 1
+                    elif spec == b"I": # PageUp
+                        if self.ui_mode == "chat":
+                            self.chat_scroll += 10
+                    elif spec == b"Q": # PageDown
+                        if self.ui_mode == "chat":
+                            self.chat_scroll = max(0, self.chat_scroll - 10)
                 else:
                     try:
                         c = char.decode("utf-8")
@@ -1108,8 +1251,14 @@ def main():
         time.sleep(2)
     else:
         # Full TUI
-        chat = LXMFChat(config_path=args.config, identity_path=args.identity, display_name=args.name, debug=args.debug)
-        chat.run()
+        try:
+            chat = LXMFChat(config_path=args.config, identity_path=args.identity, display_name=args.name, debug=args.debug)
+            chat.run()
+        except KeyboardInterrupt:
+            pass
+        except Exception as e:
+            print(f"Error: {e}")
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
