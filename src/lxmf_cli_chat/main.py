@@ -335,6 +335,13 @@ class LXMFChat:
             "  Ctrl-Q               Quit",
             "  Esc                  Return to chat mode",
             "",
+            "METADATA LABELS:",
+            "  (S)                  Signed: Cryptographically verified sender",
+            "  (ST)                 Stamped: Valid LXMF PoW delivery stamp",
+            "  (Nh)                 Hops: Number of network hops to peer",
+            "  (D) / (P)            Method: Direct or Propagated delivery",
+            "  \u2713 / \u2713\u2713              Status: Sent / Delivered",
+            "",
             "Press any key to return to chat..."
         ]
         
