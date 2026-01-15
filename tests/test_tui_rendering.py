@@ -37,7 +37,8 @@ def test_refresh_ui_no_crash(cols, lines):
         mock_chat.refresh_ui()
 
     output = captured_output.getvalue()
-    assert "\033[2J" in output
+    assert "\033[2J" not in output
+    assert "\033[H" in output
     assert "LXMF CLI Chat" in output
 
 
