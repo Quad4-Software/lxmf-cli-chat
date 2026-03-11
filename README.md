@@ -20,6 +20,16 @@ pipx install git+https://git.quad4.io/RNS-Things/LXMF-CLI-Chat.git
 # poetry
 git clone https://git.quad4.io/RNS-Things/LXMF-CLI-Chat.git
 poetry install
+
+# install package + man page from source tree
+make install
+# or:
+make install ELEVATE=sudo
+# or:
+make install ELEVATE=doas
+
+# view installed manual page
+man lxmf-chat
 ```
 
 ## Usage
@@ -48,10 +58,12 @@ lxmf-chat --send-to 7cc8d66b4f6a0e0e49d34af7f6077b5a --msg "Hello from CLI"
 - `/p` | `/peers`: Open peer list browser
 - `/n` | `/name <name>`: Change your display name
 - `/a` | `/announce`: Send a network announce
+- `/sf` | `/sendfile <path>`: Send a file to the current target
 - `/id`: Show your own destination hash
 - `/manual` | `/help`: Show the command manual
 - `/q` | `/quit`: Exit
 - `/mode <auto|direct|propagated>`: Change LXMF delivery method
+- `/pn <hex|auto|list|fetch>`: Manage active propagation node
 - `/stamp <cost>`: Set your required inbound stamp cost (1-255)
 - `/grant [hex]` | `/ticket`: Send a message and grant a one-time ticket
 - `/block <hex>`: Block a destination hash
