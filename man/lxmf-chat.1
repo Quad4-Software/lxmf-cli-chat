@@ -1,0 +1,132 @@
+.TH LXMF-CHAT 1 "March 2026" "lxmf-cli-chat" "User Commands"
+.SH NAME
+lxmf-chat \- LXMF terminal chat client
+.SH SYNOPSIS
+.B lxmf-chat
+[\fB\-\-name\fR \fINAME\fR]
+[\fB\-\-config\fR \fIDIR\fR]
+[\fB\-\-identity\fR \fIFILE\fR]
+[\fB\-\-debug\fR]
+[\fB\-\-send-to\fR \fIHEX\fR \fB\-\-msg\fR \fITEXT\fR]
+.SH DESCRIPTION
+\fBlxmf-chat\fR is an interactive TUI and headless CLI sender for LXMF over Reticulum.
+When started without \fB\-\-send-to\fR and \fB\-\-msg\fR, it runs the full terminal UI.
+When both are provided, it sends one message and exits.
+.SH OPTIONS
+.TP
+.B \-\-name NAME
+Set display name. Default: \fBAnonymous\fR.
+.TP
+.B \-\-config DIR
+Use a custom Reticulum configuration directory.
+.TP
+.B \-\-identity FILE
+Use a custom Reticulum identity file.
+.TP
+.B \-\-debug
+Enable debug logging to file.
+.TP
+.B \-\-send-to HEX
+Recipient destination hash for one-shot non-interactive send mode.
+.TP
+.B \-\-msg TEXT
+Message content used with \fB\-\-send-to\fR.
+.SH INTERACTIVE COMMANDS
+.TP
+.B /t, /target <hex>
+Set destination by full or partial hash.
+.TP
+.B /c, /chat [idx]
+Switch active session, or cycle sessions if no index is provided.
+.TP
+.B /r, /reply [msg]
+Reply to the most recent conversation.
+.TP
+.B /p, /peers
+Browse discovered peers.
+.TP
+.B /s, /search <query>
+Search peers by name or hash.
+.TP
+.B /n, /name <name>
+Set display name.
+.TP
+.B /a, /announce
+Send network announce.
+.TP
+.B /sf, /sendfile <path>
+Send file attachment to current target.
+.TP
+.B /id
+Show own destination hash.
+.TP
+.B /mode <direct|propagated|auto>
+Set delivery mode.
+.TP
+.B /pn <hex|auto|list|fetch>
+Manage propagation node selection and fetch behavior.
+.TP
+.B /stamp <1-255>
+Set required inbound stamp cost.
+.TP
+.B /grant [hex], /ticket
+Send a message and grant a one-time ticket.
+.TP
+.B /block <hex>
+Block destination hash.
+.TP
+.B /unblock <hex>
+Unblock destination hash.
+.TP
+.B /blocked
+List blocked destination hashes.
+.TP
+.B /manual, /help
+Show in-app command manual.
+.TP
+.B /q, /quit
+Exit.
+.SH TUI SHORTCUTS
+.TP
+.B Ctrl-P
+Toggle peer list mode.
+.TP
+.B Ctrl-N
+Cycle active chats.
+.TP
+.B Ctrl-A
+Trigger announce.
+.TP
+.B Ctrl-L
+Redraw screen.
+.TP
+.B Ctrl-Q
+Quit.
+.TP
+.B Esc
+Return to chat mode.
+.TP
+.B PageUp/PageDown
+Scroll chat history.
+.SH EXAMPLES
+.TP
+Run interactive TUI:
+.B lxmf-chat --name "MyName"
+.TP
+Send one message and exit:
+.B lxmf-chat --send-to 7cc8d66b4f6a0e0e49d34af7f6077b5a --msg "Hello"
+.SH FILES
+.TP
+.I ~/.lxmf_cli_chat
+Application data root (identity, local router state, logs, downloads).
+.TP
+.I ~/.lxmf_cli_chat/router/lxmf
+LXMF router storage (tickets, stamp costs, propagation state).
+.TP
+.I ~/.lxmf_cli_chat/downloads
+Received file attachments.
+.TP
+.I ~/.reticulum
+Default Reticulum config location (unless \fB\-\-config\fR is set).
+.SH SEE ALSO
+.BR rnsd (1)
