@@ -1,4 +1,4 @@
-# LXMF CLI Chat
+# LXMF Terminal Chat
 
 Basic Ephemeral TUI and CLI Client for LXMF.
 
@@ -6,19 +6,17 @@ Ephemeral as in chat sessions and announces are ephemeral/not stored, identity i
 
 Only dependencies are RNS and LXMF.
 
-![showcase image 2026](https://git.quad4.io/RNS-Things/LXMF-CLI-Chat/raw/commit/793c857384d0726a3e643b40bbdb00aff34badd0/showcase/2026-01-14_11-05.png)
-
 ## Installation
 
 ```bash
 # pip w/ git
-pip install git+https://git.quad4.io/RNS-Things/LXMF-CLI-Chat.git
+pip install git+https://github.com/Quad4-Software/lxmf-cli-chat
 
 # pipx w/ git
-pipx install git+https://git.quad4.io/RNS-Things/LXMF-CLI-Chat.git
+pipx install git+https://github.com/Quad4-Software/lxmf-cli-chat
 
 # poetry
-git clone https://git.quad4.io/RNS-Things/LXMF-CLI-Chat.git
+git clone https://github.com/Quad4-Software/lxmf-cli-chat
 poetry install
 
 # install package + man page from source tree
